@@ -1,0 +1,4 @@
+# PETER CYBER SECURITY PROGRAM Dependencies
+# Native Desktop GUI - 100% C++/Qt Native Engine (Zero WebViews / Zero HTML/CSS/JS)
+PyQt6>=6.6.0
+psutil>=5.9.0
