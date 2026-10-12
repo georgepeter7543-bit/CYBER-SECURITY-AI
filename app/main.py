@@ -40,11 +40,10 @@ def run_api_server(host=None, port=None):
     if host is None:
         host = os.environ.get("HOST", "0.0.0.0" if "PORT" in os.environ else "127.0.0.1")
 
-    dist_folder = os.path.join(current_dir, "ui", "dist")
-    static_folder = dist_folder if os.path.exists(dist_folder) else None
+    dist_folder = os.path.abspath(os.path.join(current_dir, "ui", "dist"))
 
-    app = Flask(__name__, static_folder=static_folder, static_url_path="")
-    # Enable Cross-Origin Resource Sharing for Vercel, Railway, and Vite
+    # Initialize Flask with static_folder=None so catch-all route handles both static assets and SPA fallback
+    app = Flask(__name__, static_folder=None)
     CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
     print("\n" + "="*65)
@@ -143,19 +142,62 @@ def run_api_server(host=None, port=None):
             }
         })
 
-    # Serve built React static frontend if dist exists
+    @app.route("/api/threats", methods=["GET"])
+    def get_threats():
+        return jsonify({
+            "active_arcs": 4,
+            "region": "GLOBAL",
+            "feed": [
+                {"time": time.strftime("%H:%M:%S"), "origin": "Frankfurt IXP", "target": "Arusha HQ (Tanzania)", "vector": "DDoS SYN-Flood Incursion", "severity": "CRITICAL", "action": "BLOCKED (Peter Core)"},
+                {"time": time.strftime("%H:%M:%S"), "origin": "Silicon Valley Cloud", "target": "Nairobi Gateway", "vector": "Zero-Day Kerberos Exploit", "severity": "HIGH", "action": "BLOCKED"},
+                {"time": time.strftime("%H:%M:%S"), "origin": "London Cyber Command", "target": "Johannesburg Sentinel", "vector": "Credential Stuffing Wave", "severity": "MEDIUM", "action": "RATE-LIMITED"},
+            ]
+        })
+
+    @app.route("/api/vulnerabilities", methods=["GET"])
+    def get_vulnerabilities():
+        return jsonify({
+            "posture_score": 94.8,
+            "active_cves": 3,
+            "zero_trust_compliance": "98.7%",
+            "monitored_daemons": 4
+        })
+
+    # =================================================================
+    # Unified SPA Static Route & Fallback Handler
+    # =================================================================
     @app.route("/", defaults={"path": ""})
     @app.route("/<path:path>")
     def serve_frontend(path):
-        if static_folder and os.path.exists(os.path.join(static_folder, path)) and path != "":
-            return send_from_directory(static_folder, path)
-        if static_folder and os.path.exists(os.path.join(static_folder, "index.html")):
-            return send_from_directory(static_folder, "index.html")
+        # Do not catch unresolved API endpoints
+        if path.startswith("api/"):
+            return jsonify({"error": "API route not found", "path": f"/{path}"}), 404
+
+        # Serve existing static assets (e.g., /assets/index-xxx.js, /assets/index-xxx.css, icons)
+        if path:
+            candidate_path = os.path.join(dist_folder, path)
+            if os.path.isfile(candidate_path):
+                return send_from_directory(dist_folder, path)
+
+        # Serve index.html for all client-side SPA routes (e.g., /, /dashboard, /scanner, /threat-map)
+        index_file = os.path.join(dist_folder, "index.html")
+        if os.path.isfile(index_file):
+            return send_from_directory(dist_folder, "index.html")
+
+        # Fallback if frontend dist/ has not been built yet
         return jsonify({
-            "message": "PETER CYBER SECURITY PROGRAM API Backend is running.",
-            "frontend_dev_url": "http://localhost:5173",
-            "api_endpoints": ["/api/status", "/api/telemetry", "/api/scan", "/api/recon"]
-        })
+            "status": "ONLINE",
+            "message": "PETER CYBER SECURITY PROGRAM Unified Backend is active.",
+            "note": "Frontend static bundle not found at app/ui/dist/. Run 'npm run build' inside app/ui/ to build the frontend.",
+            "api_endpoints": [
+                "/api/status",
+                "/api/telemetry",
+                "/api/scan",
+                "/api/recon",
+                "/api/threats",
+                "/api/vulnerabilities"
+            ]
+        }), 200
 
     app.run(host=host, port=port, debug=False)
 

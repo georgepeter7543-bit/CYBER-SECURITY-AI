@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Shield, UploadCloud, Play, Square, CheckCircle, AlertTriangle, FileText, Lock } from 'lucide-react';
 
-const API_BASE_URL = (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/$/, "");
+import { API_BASE_URL } from '../config';
 
 export default function VirusScanner() {
   const [file, setFile] = useState(null);

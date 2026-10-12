@@ -5,7 +5,7 @@ import ThreatMap from './components/ThreatMap';
 import HackerGPT from './components/HackerGPT';
 import VulnerabilityOverview from './components/VulnerabilityOverview';
 
-const API_BASE_URL = (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/$/, "");
+import { API_BASE_URL } from './config';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('chat'); // default to HackerGPT or scanner

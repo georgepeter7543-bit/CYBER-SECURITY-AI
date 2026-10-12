@@ -20,7 +20,7 @@ const defaultReconJson = {
   }
 };
 
-const API_BASE_URL = (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/$/, "");
+import { API_BASE_URL } from '../config';
 
 export default function HackerGPT() {
   const [copied, setCopied] = useState(false);

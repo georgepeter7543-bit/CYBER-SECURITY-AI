@@ -137,37 +137,54 @@ PETER CYBER SECURITY PROGRAM/
 
 ---
 
-## 🚀 Setup & Execution Guide
+## 🚀 Unified Full-Stack Architecture & Execution
 
-### Prerequisites
-- Python 3.10+ (Tested and verified on Python 3.14).
-- Windows 10/11, macOS, or Linux.
+The application can be run as a **unified full-stack web service** (where Python Flask serves the compiled React SPA directly on a single port with relative `/api/...` endpoints) or as a **native PyQt6 desktop application**.
 
-### 1. Installation
-Clone or navigate to the project directory and install the native dependencies:
-
+### 1. Install Dependencies
 ```bash
+# Python backend dependencies
 pip install -r requirements.txt
+
+# React frontend dependencies
+cd app/ui
+npm install
+cd ../..
 ```
 
-*(Dependencies are strictly `PyQt6` and `psutil`)*
+### 2. Single-Command Build & Run (Unified Full-Stack)
+Compile the React frontend into `app/ui/dist/` and launch the unified Python server with one command:
 
-### 2. Launch the Application
-Run the launcher script:
-
+**Cross-Platform (Python):**
 ```bash
+python build_and_run.py
+```
+
+**PowerShell:**
+```powershell
+.\build_and_run.ps1
+```
+
+**Terminal Manual Command:**
+```bash
+cd app/ui && npm run build && cd ../.. && python app/main.py
+```
+
+Open **`http://localhost:5000`** in your browser. All API endpoints (`/api/telemetry`, `/api/scan`, `/api/recon`, `/api/threats`, `/api/vulnerabilities`) and non-API web routes are served seamlessly from the same origin.
+
+---
+
+### 3. Native Desktop Mode
+To launch the native hardware-accelerated PyQt6 desktop application window:
+```bash
+python app/main.py --desktop
+# or
 python run.py
 ```
 
-Or execute via the app package:
+---
 
-```bash
-python -m app.main
-```
-
-### 3. Run Automated Tests
-Execute the component test suite:
-
+### 4. Run Automated Tests
 ```bash
 python -m unittest tests/test_components.py
 ```
