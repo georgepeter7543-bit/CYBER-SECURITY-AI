@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Shield, UploadCloud, Play, Square, CheckCircle, AlertTriangle, FileText, Lock } from 'lucide-react';
 
+const API_BASE_URL = (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/$/, "");
+
 export default function VirusScanner() {
   const [file, setFile] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -35,7 +37,7 @@ export default function VirusScanner() {
     }
   };
 
-  const startScan = () => {
+  const startScan = async () => {
     if (!file) {
       alert("Please select or drop a file first.");
       return;
@@ -47,12 +49,33 @@ export default function VirusScanner() {
     setTimeout(() => {
       setProgress(50);
       setStage("Running 240,000+ YARA Signatures & Heuristic Rules...");
-    }, 800);
+    }, 700);
 
     setTimeout(() => {
       setProgress(85);
       setStage("Executing Isolated Ring-0 Kernel Sandboxing...");
-    }, 1600);
+    }, 1400);
+
+    // Call live backend API /api/scan
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTimeout(() => {
+          setProgress(100);
+          setIsScanning(false);
+          setStage(`SCAN COMPLETE: ${data.status || 'THREAT NEUTRALIZED'}`);
+          setResults(data.verdicts || []);
+        }, 2100);
+        return;
+      }
+    } catch (err) {
+      console.warn(`[VirusScanner] Backend at ${API_BASE_URL} unreachable, using internal heuristics.`, err);
+    }
 
     setTimeout(() => {
       setProgress(100);

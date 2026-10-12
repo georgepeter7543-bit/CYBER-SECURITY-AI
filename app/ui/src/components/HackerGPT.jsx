@@ -20,6 +20,8 @@ const defaultReconJson = {
   }
 };
 
+const API_BASE_URL = (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/$/, "");
+
 export default function HackerGPT() {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(true);
@@ -45,14 +47,37 @@ export default function HackerGPT() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!inputVal.trim()) return;
     const query = inputVal.trim();
     setInputVal('');
 
     const newMessages = [...messages, { type: 'user', text: query }];
+    setMessages(newMessages);
 
-    // Realistic automated recon response
+    // Call live backend on Render/Railway/localhost
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/recon`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMessages([...newMessages, {
+          type: 'recon',
+          target: data.target || query,
+          ip: data.ip || '198.51.100.82',
+          whois: data.whois || 'ARIN Registry - Cloudflare / Fastly Edge Proxy.',
+          jsonData: data.fingerprint || defaultReconJson
+        }]);
+        return;
+      }
+    } catch (err) {
+      console.warn(`[HackerGPT] Backend at ${API_BASE_URL} unreachable, using local heuristic fallback.`, err);
+    }
+
+    // Fallback simulation if backend offline
     const targetClean = query.replace(/^(check|scan|inspect)\s+/i, '').replace(/\/$/, '');
     const isArusha = /arusha|tz|tanzania/i.test(query);
 

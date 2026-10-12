@@ -29,23 +29,31 @@ except ImportError:
 # =====================================================================
 # 1. FLASK REST API SERVER (For Vite/React Frontend: npm run dev)
 # =====================================================================
-def run_api_server(host="127.0.0.1", port=5000):
+def run_api_server(host=None, port=None):
     """Launches the Flask backend API server for the React frontend."""
     from flask import Flask, jsonify, request, send_from_directory
     from flask_cors import CORS
+
+    # Cloud hosting support (Render, Railway, Fly.io provide PORT in environment)
+    if port is None:
+        port = int(os.environ.get("PORT", 5000))
+    if host is None:
+        host = os.environ.get("HOST", "0.0.0.0" if "PORT" in os.environ else "127.0.0.1")
 
     dist_folder = os.path.join(current_dir, "ui", "dist")
     static_folder = dist_folder if os.path.exists(dist_folder) else None
 
     app = Flask(__name__, static_folder=static_folder, static_url_path="")
-    CORS(app)  # Enable Cross-Origin Resource Sharing for Vite (http://localhost:5173)
+    # Enable Cross-Origin Resource Sharing for Vercel, Railway, and Vite
+    CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
     print("\n" + "="*65)
     print(" 🛡️  PETER CYBER SECURITY PROGRAM - BACKEND API SERVER")
     print("="*65)
     print(f" [*] Status:   Active and Listening")
+    print(f" [*] Host/Port: {host}:{port}")
     print(f" [*] Endpoint: http://{host}:{port}/api/status")
-    print(f" [*] Frontend: Connect via http://localhost:5173 (npm run dev)")
+    print(f" [*] Frontend: Connect via Vercel or http://localhost:5173")
     print("="*65 + "\n")
 
     @app.route("/api/status", methods=["GET"])

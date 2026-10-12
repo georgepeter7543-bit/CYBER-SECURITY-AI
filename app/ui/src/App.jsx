@@ -5,6 +5,8 @@ import ThreatMap from './components/ThreatMap';
 import HackerGPT from './components/HackerGPT';
 import VulnerabilityOverview from './components/VulnerabilityOverview';
 
+const API_BASE_URL = (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/$/, "");
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('chat'); // default to HackerGPT or scanner
   const [cpu, setCpu] = useState(18.4);
@@ -13,15 +15,30 @@ export default function App() {
   const [netRx, setNetRx] = useState(112.5);
   const [uptime, setUptime] = useState(0);
 
-  // Live telemetry interval
+  // Live telemetry interval connecting to live backend (Render/Railway/localhost)
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCpu(+(15 + Math.random() * 8).toFixed(1));
-      setRam(+(7.4 + Math.random() * 0.8).toFixed(1));
-      setNetTx(+(20 + Math.random() * 12).toFixed(1));
-      setNetRx(+(95 + Math.random() * 25).toFixed(1));
+    const fetchTelemetry = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/telemetry`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.cpu_percent !== undefined) setCpu(data.cpu_percent);
+          if (data.ram_used_gb !== undefined) setRam(data.ram_used_gb);
+          if (data.net_tx_mb !== undefined) setNetTx(data.net_tx_mb);
+          if (data.net_rx_mb !== undefined) setNetRx(data.net_rx_mb);
+        }
+      } catch (err) {
+        // Fallback simulation if backend is spinning up or offline
+        setCpu(+(15 + Math.random() * 8).toFixed(1));
+        setRam(+(7.4 + Math.random() * 0.8).toFixed(1));
+        setNetTx(+(20 + Math.random() * 12).toFixed(1));
+        setNetRx(+(95 + Math.random() * 25).toFixed(1));
+      }
       setUptime(u => u + 1);
-    }, 2000);
+    };
+
+    fetchTelemetry();
+    const timer = setInterval(fetchTelemetry, 2500);
     return () => clearInterval(timer);
   }, []);
 
