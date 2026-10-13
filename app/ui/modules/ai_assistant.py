@@ -14,10 +14,53 @@ from PyQt6.QtWidgets import (
 )
 
 from app.core.config import CyberTheme
+from app.core.chatbot import INITIAL_GREETING, SYSTEM_PROMPT, generate_chat_response
 from app.ui.widgets.hacker_gpt_input import HackerGPTInputConsole
 from app.ui.widgets.hacker_gpt_recon import (
     HackerGPTReconSnapshotWidget, HackerGPTCodeBox
 )
+
+
+class AIAssistantMessageWidget(QFrame):
+    """
+    Renders the AI Assistant's clean greeting, technical explanations,
+    and out-of-scope notices with cyberpunk cyber-defense styling.
+    """
+    def __init__(self, message_text: str, badge_text: str = "PETER CYBER DEFENSE AI", parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("""
+            AIAssistantMessageWidget {
+                background-color: #0E1118;
+                border: 1px solid #1E2330;
+                border-left: 3px solid #06B6D4;
+                border-radius: 8px;
+            }
+        """)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(8)
+
+        # Header Badge
+        header = QHBoxLayout()
+        badge_lbl = QLabel(f"🛡️  {badge_text}")
+        badge_lbl.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        badge_lbl.setStyleSheet("color: #06B6D4; letter-spacing: 0.5px;")
+        header.addWidget(badge_lbl)
+        header.addStretch()
+
+        time_lbl = QLabel(time.strftime("%H:%M:%S"))
+        time_lbl.setFont(QFont("Consolas", 9))
+        time_lbl.setStyleSheet("color: #64748B;")
+        header.addWidget(time_lbl)
+        layout.addLayout(header)
+
+        # Body Text
+        lbl = QLabel(message_text)
+        lbl.setFont(QFont("Segoe UI", 11))
+        lbl.setStyleSheet("color: #E2E8F0; line-height: 1.5;")
+        lbl.setWordWrap(True)
+        lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        layout.addWidget(lbl)
 
 
 class UserPromptWidget(QWidget):
@@ -240,7 +283,8 @@ class AIAssistantModule(QWidget):
     # HackerGPT Recon Content Generation
     # -----------------------------------------------------------------
     def _load_default_hacker_gpt_demo(self):
-        """Preloads the exact recon snapshot shown in the user's screenshot."""
+        """Preloads clean welcome greeting and initial recon snapshot."""
+        self._add_assistant_message(INITIAL_GREETING)
         self._add_user_prompt("Check cybergym.hackergpt.app/")
 
         demo_json = json.dumps({
@@ -269,6 +313,13 @@ class AIAssistantModule(QWidget):
             json_fingerprint=demo_json
         )
 
+    def _add_assistant_message(self, text: str, badge_text: str = "PETER CYBER DEFENSE AI"):
+        item = self.chat_layout.takeAt(self.chat_layout.count() - 1)
+        msg_widget = AIAssistantMessageWidget(text, badge_text=badge_text)
+        self.chat_layout.addWidget(msg_widget)
+        self.chat_layout.addStretch()
+        self._scroll_to_bottom()
+
     def _add_user_prompt(self, text: str):
         item = self.chat_layout.takeAt(self.chat_layout.count() - 1)
         prompt_widget = UserPromptWidget(text)
@@ -296,95 +347,26 @@ class AIAssistantModule(QWidget):
         QTimer.singleShot(400, lambda: self._process_query_response(query))
 
     def _process_query_response(self, query: str):
-        q = query.lower()
+        res = generate_chat_response(query)
+        scope = res.get("scope", "SECURITY")
 
-        # Handle URL / Domain Reconnaissance requests
-        if "check " in q or "scan " in q or ".app" in q or ".com" in q or ".org" in q or ".tz" in q or "http" in q:
-            target = query.replace("Check ", "").replace("check ", "").replace("scan ", "").replace("Scan ", "").strip()
-            if "/" in target:
-                target = target.rstrip("/")
-
-            if "arusha" in target or "tz" in target:
-                ip = "102.214.32.14"
-                whois = "Tanzania Network Information Centre (tzNIC) - Peter Defense Grid Arusha."
-                country = "TANZANIA"
-                module_code = "TZ"
-            elif "cybergym" in target:
-                ip = "34.231.169.117"
-                whois = "No publicly-available WHOIS record was returned for the sub-domain."
-                country = "UNITED STATES"
-                module_code = "US"
-            else:
-                ip = "198.51.100.82"
-                whois = "ARIN Registry - Cloudflare / Fastly Edge Proxy."
-                country = "GLOBAL ANYCAST"
-                module_code = "GL"
-
-            res_json = json.dumps({
-                "target": f"http://{target}",
-                "http_status": 200,
-                "request_config": {
-                    "headers": {
-                        "User-Agent": "HackerGPT/4.2 (Zero-Trust Recon Engine; x64)"
-                    }
-                },
-                "plugins": {
-                    "Country": {"string": [country], "module": [module_code]},
-                    "HTML5": {},
-                    "IP": {"string": [ip]},
-                    "WAF": {"string": ["Cloudflare / Peter Shield Active"]},
-                    "SecurityHeaders": {"string": ["Strict-Transport-Security, X-Frame-Options: DENY"]},
-                    "OpenPorts": {"string": ["80/TCP, 443/TCP (TLS 1.3)"]},
-                    "VulnerabilityWeight": "0.0 - SECURE"
-                }
-            }, indent=2)
-
-            self._add_recon_snapshot(target, ip, whois, res_json)
-
-        elif "/audit-ports" in q or "port" in q:
-            code = (
-                "# HackerGPT Netstat Recon Telemetry\n"
-                "PORT     STATE SERVICE      REASON          VERSION\n"
-                "22/tcp   open  ssh          syn-ack ttl 64  OpenSSH 9.6p1\n"
-                "80/tcp   open  http         syn-ack ttl 64  nginx 1.26.0\n"
-                "443/tcp  open  ssl/https    syn-ack ttl 64  nginx 1.26.0 (TLS 1.3 only)\n"
-                "8080/tcp open  http-proxy   syn-ack ttl 64  [ALERT: Unauthenticated Dev API]\n\n"
-                "# Remediation Directive\n"
-                "iptables -A INPUT -p tcp --dport 8080 ! -s 127.0.0.1 -j DROP"
+        if scope == "RECON":
+            self._add_recon_snapshot(
+                target=res["target"],
+                ip=res["ip"],
+                whois=res["whois"],
+                json_fingerprint=json.dumps(res["fingerprint"], indent=2)
             )
-            self._add_code_response(code, lang="text")
-
-        elif "/firewall-rules" in q or "firewall" in q:
-            code = (
-                "#!/bin/bash\n"
-                "# HackerGPT Hardened Netfilter Matrix\n"
-                "iptables -P INPUT DROP\n"
-                "iptables -P FORWARD DROP\n"
-                "iptables -P OUTPUT ACCEPT\n"
-                "iptables -A INPUT -i lo -j ACCEPT\n"
-                "iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT\n"
-                "iptables -A INPUT -p tcp -m multiport --dports 22,443 -j ACCEPT\n"
-                "echo '[+] Zero-Trust Perimeter Rules Enforced'"
-            )
-            self._add_code_response(code, lang="text")
-
-        elif "/zero-day-check" in q or "cve" in q or "zero" in q:
-            code = (
-                "TARGET ADVISORY DATABASE QUERY:\n"
-                "CVE-2026-31902 | OpenSSL 3.0.x Handshake Memory Leak | STATUS: PATCHED\n"
-                "CVE-2026-28114 | Linux eBPF Ring Buffer Overflow     | STATUS: MITIGATED\n"
-                "CVE-2026-44019 | Win32k GDI Handle Privilege Escalation| STATUS: SECURE"
-            )
-            self._add_code_response(code, lang="text")
-
+        elif scope == "OUT_OF_SCOPE":
+            self._add_assistant_message(res["reply"], badge_text="SCOPE POLICY ENFORCED")
+        elif scope == "GREETING":
+            self._add_assistant_message(res["reply"], badge_text="PETER CYBER DEFENSE AI")
         else:
-            resp = json.dumps({
-                "query": query,
-                "status": "ANALYSIS_COMPLETE",
-                "hacker_gpt_assessment": "Host defenses stable. Zero unauthorized ingress vectors detected.",
-                "recommendation": "Use 'Check <url>' to run a live reconnaissance snapshot or '/audit-ports' for listening socket inspection."
-            }, indent=2)
-            self._add_code_response(resp, lang="json")
+            # Cybersecurity technical response
+            self._add_assistant_message(res["reply"], badge_text=f"CYBER DEFENSE // {res['target']}")
+            if "technical_telemetry" in res.get("fingerprint", {}):
+                telemetry = json.dumps(res["fingerprint"]["technical_telemetry"], indent=2)
+                self._add_code_response(telemetry, lang="json")
 
     def _on_file_attached(self, file_path: str):
         import os
@@ -398,6 +380,10 @@ class AIAssistantModule(QWidget):
             "packer_detected": "UPX 4.02",
             "status": "SUSPICIOUS - High entropy payload requiring sandbox isolation"
         }, indent=2)
+        self._add_assistant_message(
+            f"Artifact `{fname}` analyzed. High-entropy packed payload detected. "
+            "Sandbox execution quarantine recommended before running on production endpoints."
+        )
         self._add_code_response(resp, lang="json")
 
     def _start_new_chat(self):
@@ -406,7 +392,7 @@ class AIAssistantModule(QWidget):
             child = self.chat_layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
-        self._add_user_prompt("New session initialized. Ready for target reconnaissance.")
+        self._add_assistant_message(INITIAL_GREETING)
 
     def _toggle_sidebar(self):
         self.sidebar_visible = not self.sidebar_visible

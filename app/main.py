@@ -20,6 +20,7 @@ try:
     from app.core.config import APP_TITLE, APP_VERSION, GLOBAL_NODES
     from app.core.security_engine import calculate_file_hashes
     from app.core.system_monitor import HAS_PSUTIL
+    from app.core.chatbot import generate_chat_response, INITIAL_GREETING, SYSTEM_PROMPT
     if HAS_PSUTIL:
         import psutil
 except ImportError:
@@ -29,31 +30,16 @@ except ImportError:
 # =====================================================================
 # 1. FLASK REST API SERVER (For Vite/React Frontend: npm run dev)
 # =====================================================================
-def run_api_server(host=None, port=None):
-    """Launches the Flask backend API server for the React frontend."""
+def create_app():
+    """Factory creating and configuring the Flask REST API application."""
     from flask import Flask, jsonify, request, send_from_directory
     from flask_cors import CORS
-
-    # Cloud hosting support (Render, Railway, Fly.io provide PORT in environment)
-    if port is None:
-        port = int(os.environ.get("PORT", 5000))
-    if host is None:
-        host = os.environ.get("HOST", "0.0.0.0" if "PORT" in os.environ else "127.0.0.1")
 
     dist_folder = os.path.abspath(os.path.join(current_dir, "ui", "dist"))
 
     # Initialize Flask with static_folder=None so catch-all route handles both static assets and SPA fallback
     app = Flask(__name__, static_folder=None)
     CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
-
-    print("\n" + "="*65)
-    print(" 🛡️  PETER CYBER SECURITY PROGRAM - BACKEND API SERVER")
-    print("="*65)
-    print(f" [*] Status:   Active and Listening")
-    print(f" [*] Host/Port: {host}:{port}")
-    print(f" [*] Endpoint: http://{host}:{port}/api/status")
-    print(f" [*] Frontend: Connect via Vercel or http://localhost:5173")
-    print("="*65 + "\n")
 
     @app.route("/api/status", methods=["GET"])
     def get_status():
@@ -111,35 +97,33 @@ def run_api_server(host=None, port=None):
     @app.route("/api/recon", methods=["POST"])
     def post_recon():
         data = request.json or {}
-        query = data.get("query", "cybergym.hackergpt.app")
-        target = query.replace("Check ", "").replace("check ", "").replace("scan ", "").strip().rstrip("/")
-        is_arusha = any(k in target.lower() for k in ["arusha", "tz", "tanzania"])
+        query = data.get("query") or data.get("message") or "cybergym.hackergpt.app"
+        response = generate_chat_response(query)
+        return jsonify(response)
 
-        ip = "102.214.32.14" if is_arusha else "34.231.169.117"
-        whois = "tzNIC - Peter Defense Grid Arusha" if is_arusha else "No publicly-available WHOIS record was returned for the sub-domain."
+    @app.route("/api/chat", methods=["GET", "POST"])
+    def post_chat():
+        if request.method == "GET":
+            return jsonify({
+                "status": "ONLINE",
+                "model": "NEURAL-DEFENSE v4.2",
+                "greeting": INITIAL_GREETING,
+                "message": INITIAL_GREETING,
+                "system_persona": "Peter Cybersecurity Assistant",
+                "scope_enforcement": "STRICT_CYBERSECURITY_ONLY"
+            })
+        data = request.json or {}
+        query = data.get("query") or data.get("message") or ""
+        response = generate_chat_response(query)
+        return jsonify(response)
 
+    @app.route("/api/chat/greeting", methods=["GET"])
+    def get_chat_greeting():
         return jsonify({
-            "target": target,
-            "ip": ip,
-            "whois": whois,
-            "fingerprint": {
-                "target": f"http://{target}",
-                "http_status": 200,
-                "request_config": {
-                    "headers": {
-                        "User-Agent": "HackerGPT/4.2 (Zero-Trust Recon Engine; x64)"
-                    }
-                },
-                "plugins": {
-                    "Country": {"string": ["TANZANIA" if is_arusha else "UNITED STATES"], "module": ["TZ" if is_arusha else "US"]},
-                    "HTML5": {},
-                    "IP": {"string": [ip]},
-                    "JQuery": {"version": ["2.2.4"]},
-                    "WAF": {"string": ["Cloudflare / Peter Shield Active"]},
-                    "Title": {"string": ["CyberGym"]},
-                    "UncommonHeaders": {"string": ["access-control-allow-origin,x-content-type-options,feature-policy,x-re..."]}
-                }
-            }
+            "status": "ONLINE",
+            "greeting": INITIAL_GREETING,
+            "message": INITIAL_GREETING,
+            "system_prompt": SYSTEM_PROMPT
         })
 
     @app.route("/api/threats", methods=["GET"])
@@ -194,11 +178,34 @@ def run_api_server(host=None, port=None):
                 "/api/telemetry",
                 "/api/scan",
                 "/api/recon",
+                "/api/chat",
+                "/api/chat/greeting",
                 "/api/threats",
                 "/api/vulnerabilities"
             ]
         }), 200
 
+    return app
+
+
+def run_api_server(host=None, port=None):
+    """Launches the Flask backend API server for the React frontend."""
+    # Cloud hosting support (Render, Railway, Fly.io provide PORT in environment)
+    if port is None:
+        port = int(os.environ.get("PORT", 5000))
+    if host is None:
+        host = os.environ.get("HOST", "0.0.0.0" if "PORT" in os.environ else "127.0.0.1")
+
+    print("\n" + "="*65)
+    print(" 🛡️  PETER CYBER SECURITY PROGRAM - BACKEND API SERVER")
+    print("="*65)
+    print(f" [*] Status:   Active and Listening")
+    print(f" [*] Host/Port: {host}:{port}")
+    print(f" [*] Endpoint: http://{host}:{port}/api/status")
+    print(f" [*] Frontend: Connect via Vercel or http://localhost:5173")
+    print("="*65 + "\n")
+
+    app = create_app()
     app.run(host=host, port=port, debug=False)
 
 

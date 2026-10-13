@@ -120,6 +120,51 @@ class TestCyberSecurityProgram(unittest.TestCase):
         # Ensure chat container received widgets
         self.assertGreater(ai_module.chat_layout.count(), 1)
 
+    def test_ai_chatbot_greeting_and_scope_enforcement(self):
+        """Verify initial greeting, in-scope queries, and out-of-scope restriction enforcement."""
+        from app.core.chatbot import INITIAL_GREETING, generate_chat_response, classify_query
+
+        # 1. Initial Greeting Verification
+        self.assertIn("Hey!", INITIAL_GREETING)
+        self.assertIn("cybersecurity or computer safety", INITIAL_GREETING)
+
+        greeting_resp = generate_chat_response("hi")
+        self.assertIn(INITIAL_GREETING, greeting_resp["reply"])
+        self.assertEqual(greeting_resp["scope"], "GREETING")
+
+        # 2. In-Scope Cybersecurity Queries
+        ransom_resp = generate_chat_response("How do I protect against ransomware?")
+        self.assertEqual(ransom_resp["scope"], "SECURITY")
+        self.assertIn("3-2-1", ransom_resp["reply"])
+        self.assertIn("fingerprint", ransom_resp)
+
+        troubleshoot_resp = generate_chat_response("My computer is running very slow and freezing")
+        self.assertEqual(troubleshoot_resp["scope"], "SECURITY")
+        self.assertIn("Task Manager", troubleshoot_resp["reply"])
+
+        hardware_resp = generate_chat_response("What are the precautions for untrusted USB flash drives?")
+        self.assertEqual(hardware_resp["scope"], "SECURITY")
+        self.assertIn("BadUSB", hardware_resp["reply"])
+
+        # 3. Out-of-Scope Queries (Cooking, Sports, Entertainment)
+        cooking_resp = generate_chat_response("How do I bake a chocolate cake?")
+        self.assertEqual(cooking_resp["scope"], "OUT_OF_SCOPE")
+        self.assertIn("dedicated specifically to cybersecurity and computer safety", cooking_resp["reply"].lower())
+
+        sports_resp = generate_chat_response("Who won the football championship match?")
+        self.assertEqual(sports_resp["scope"], "OUT_OF_SCOPE")
+        self.assertIn("dedicated specifically to cybersecurity and computer safety", sports_resp["reply"].lower())
+
+        # 4. Frontend Payload Compatibility
+        for resp in [greeting_resp, ransom_resp, cooking_resp]:
+            self.assertIn("target", resp)
+            self.assertIn("ip", resp)
+            self.assertIn("whois", resp)
+            self.assertIn("fingerprint", resp)
+            self.assertIn("reply", resp)
+            self.assertIn("message", resp)
+            self.assertIsInstance(resp["fingerprint"], dict)
+
 
 if __name__ == "__main__":
     unittest.main()
